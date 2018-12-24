@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>盒子</title>
+  
+  
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="https://www.liuyong.cc/"/>
+  <updated>2018-12-24T00:57:37.303Z</updated>
+  <id>https://www.liuyong.cc/</id>
+  
+  <author>
+    <name>Liu Yong</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>test</title>
+    <link href="https://www.liuyong.cc/2018/12/24/test/"/>
+    <id>https://www.liuyong.cc/2018/12/24/test/</id>
+    <published>2018-12-24T00:47:59.000Z</published>
+    <updated>2018-12-24T00:57:37.303Z</updated>
+    
+    <content type="html"><![CDATA[<p>打发打发啊发生的发阿斯蒂芬阿斯顿</p><p>爱的色放阿斯顿</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;打发打发啊发生的发阿斯蒂芬阿斯顿&lt;/p&gt;
+&lt;p&gt;爱的色放阿斯顿&lt;/p&gt;
+
+      
+    
+    </summary>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>HashMap在多线程情况下还会导致死循环吗</title>
+    <link href="https://www.liuyong.cc/2018/06/10/HashMap%E5%9C%A8%E5%A4%9A%E7%BA%BF%E7%A8%8B%E6%83%85%E5%86%B5%E4%B8%8B%E8%BF%98%E4%BC%9A%E5%AF%BC%E8%87%B4%E6%AD%BB%E5%BE%AA%E7%8E%AF%E5%90%97/"/>
+    <id>https://www.liuyong.cc/2018/06/10/HashMap在多线程情况下还会导致死循环吗/</id>
+    <published>2018-06-10T14:56:44.000Z</published>
+    <updated>2018-06-10T04:01:00.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>先放结论，这个问题出现在JDK1.7及以前版本中，而现在JDK1.8中已经解决这个问题了。</p><h3 id="JDK1-7中的死循环"><a href="#JDK1-7中的死循环" class="headerlink" title="JDK1.7中的死循环"></a>JDK1.7中的死循环</h3><p>我们知道HashMap&lt;K,V&gt;存放的数据量大于了装载因子（默认75%），那么HashMap&lt;K,V&gt;就需要进行扩容操作，扩容的空间大小就是原来空间的两倍，但是扩容的时候需要rehash操作,然后赋给新的HashMap&lt;K,V&gt;。</p><p>JDK中需要使用resize()函数进行扩容，下面时resize()的代码：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">resize</span><span class="params">(<span class="keyword">int</span> newCapacity)</span> </span>&#123;</span><br><span class="line">        Entry[] oldTable = table;</span><br><span class="line">        <span class="keyword">int</span> oldCapacity = oldTable.length;</span><br><span class="line">        <span class="keyword">if</span> (oldCapacity == MAXIMUM_CAPACITY) &#123;</span><br><span class="line">            threshold = Integer.MAX_VALUE;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        Entry[] newTable = <span class="keyword">new</span> Entry[newCapacity];</span><br><span class="line">        <span class="keyword">boolean</span> oldAltHashing = useAltHashing;</span><br><span class="line">        useAltHashing |= sun.misc.VM.isBooted() &amp;&amp;</span><br><span class="line">                (newCapacity &gt;= Holder.ALTERNATIVE_HASHING_THRESHOLD);</span><br><span class="line">        <span class="keyword">boolean</span> rehash = oldAltHashing ^ useAltHashing;</span><br><span class="line">        transfer(newTable, rehash);  <span class="comment">//transfer函数的调用</span></span><br><span class="line">        table = newTable;</span><br><span class="line">        threshold = (<span class="keyword">int</span>)Math.min(newCapacity * loadFactor, MAXIMUM_CAPACITY + <span class="number">1</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure><p>在resize()这个过程中,在并发情况下也是不会出现死循环的问题，关键问题是transfer函数的调用过程。</p><p>下面时transfer()的源码：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">transfer</span><span class="params">(Entry[] newTable, <span class="keyword">boolean</span> rehash)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">int</span> newCapacity = newTable.length;</span><br><span class="line">        <span class="keyword">for</span> (Entry&lt;K,V&gt; e : table) &#123; <span class="comment">//这里才是问题出现的关键..</span></span><br><span class="line">            <span class="keyword">while</span>(<span class="keyword">null</span> != e) &#123;</span><br><span class="line">                Entry&lt;K,V&gt; next = e.next;  <span class="comment">//寻找到下一个节点..</span></span><br><span class="line">                <span class="keyword">if</span> (rehash) &#123;</span><br><span class="line">                    e.hash = <span class="keyword">null</span> == e.key ? <span class="number">0</span> : hash(e.key);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">int</span> i = indexFor(e.hash, newCapacity);  <span class="comment">//重新获取hashcode</span></span><br><span class="line">                e.next = newTable[i];  </span><br><span class="line">                newTable[i] = e;</span><br><span class="line">                e = next;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure><p>while中的操作我们先简化成四个步骤：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">next = e.next;</span><br><span class="line">e.next = newTable[i];</span><br><span class="line">newTable[i] = e;</span><br><span class="line">e = next;</span><br></pre></td></tr></table></figure><p>下面来抽象一下发生死循环的过程：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 线程一开始执行while内的操作</span></span><br><span class="line">next = e.next;</span><br><span class="line">e.next = newTable[i];</span><br><span class="line">newTable[i] = e;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 紧接着线程二执行while内的操作</span></span><br><span class="line">next = e.next;</span><br><span class="line">e.next = newTable[i]; <span class="comment">// 经线程一操作，此时newTable[i]实际上为e</span></span><br></pre></td></tr></table></figure><p>上述情况导致e.next = e，造成一个闭环，最终形成死循环。</p><h3 id="JDK1-8中的解决方案"><a href="#JDK1-8中的解决方案" class="headerlink" title="JDK1.8中的解决方案"></a>JDK1.8中的解决方案</h3><p>在1.8中resize()方法不再调用transfer()方法，而是直接将原来transfer()方法中的代码写在自己方法体内； 同时还有一个重大改变，那就是：<strong>扩容后，新数组中的链表顺序依然与旧数组中的链表顺序保持一致！</strong> </p><p>下面是resize()方法的部分源码：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//如果扩容后，元素的index依然与原来一样，那么使用这个head和tail指针</span></span><br><span class="line">Node&lt;K,V&gt; loHead = <span class="keyword">null</span>, loTail = <span class="keyword">null</span></span><br><span class="line"><span class="comment">//如果扩容后，元素的index=index+oldCap，那么使用这个head和tail指针</span></span><br><span class="line">Node&lt;K,V&gt; hiHead = <span class="keyword">null</span>, hiTail = <span class="keyword">null</span></span><br><span class="line">Node&lt;K,V&gt; next;</span><br><span class="line"><span class="keyword">do</span> &#123;</span><br><span class="line">    next = e.next;</span><br><span class="line">    <span class="comment">//这个地方直接通过hash值与oldCap进行与操作得出元素在新数组的index</span></span><br><span class="line">    <span class="keyword">if</span> ((e.hash &amp; oldCap) == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (loTail == <span class="keyword">null</span>)</span><br><span class="line">            loHead = e;</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            loTail.next = e;  </span><br><span class="line">        loTail = e;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (hiTail == <span class="keyword">null</span>)</span><br><span class="line">            hiHead = e;</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            hiTail.next = e;   </span><br><span class="line">        hiTail = e;</span><br><span class="line">    &#125;</span><br><span class="line">&#125; <span class="keyword">while</span> ((e = next) != <span class="keyword">null</span>);</span><br></pre></td></tr></table></figure><p>实际抽象出来只有两步：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1.添加一个节点</span></span><br><span class="line"><span class="keyword">if</span> (tail == <span class="keyword">null</span>)</span><br><span class="line">    head = e;</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">    tail.next = e;</span><br><span class="line"><span class="comment">// 2.tail指针往后移动一位，维持顺序    </span></span><br><span class="line">tail = e;</span><br></pre></td></tr></table></figure><p>这样就可以解决死循环问题了。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;先放结论，这个问题出现在JDK1.7及以前版本中，而现在JDK1.8中已经解决这个问题了。&lt;/p&gt;
+&lt;h3 id=&quot;JDK1-7中的死循环&quot;&gt;&lt;a href=&quot;#JDK1-7中的死循环&quot; class=&quot;headerlink&quot; title=&quot;JDK1.7中的死循环&quot;&gt;&lt;/a&gt;
+      
+    
+    </summary>
+    
+      <category term="Java基础" scheme="https://www.liuyong.cc/categories/Java%E5%9F%BA%E7%A1%80/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Rotate Image</title>
+    <link href="https://www.liuyong.cc/2018/06/09/Rotate%20Image/"/>
+    <id>https://www.liuyong.cc/2018/06/09/Rotate Image/</id>
+    <published>2018-06-09T14:59:44.000Z</published>
+    <updated>2018-06-09T16:26:44.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>You are given an <em>n</em> x <em>n</em> 2D matrix representing an image.</p><p>Rotate the image by 90 degrees (clockwise).</p><p><strong>Note:</strong></p><p>You have to rotate the image <a href="https://en.wikipedia.org/wiki/In-place_algorithm" target="_blank" rel="noopener"><strong>in-place</strong></a>, which means you have to modify the input 2D matrix directly. <strong>DO NOT</strong> allocate another 2D matrix and do the rotation.</p><p><strong>Example 1:</strong></p><figure class="highlight inform7"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">Given input matrix = </span><br><span class="line"><span class="comment">[</span></span><br><span class="line"><span class="comment">  <span class="comment">[1,2,3]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[4,5,6]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[7,8,9]</span></span></span><br><span class="line"><span class="comment">]</span>,</span><br><span class="line"></span><br><span class="line">rotate the input matrix in-place such that it becomes:</span><br><span class="line"><span class="comment">[</span></span><br><span class="line"><span class="comment">  <span class="comment">[7,4,1]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[8,5,2]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[9,6,3]</span></span></span><br><span class="line"><span class="comment">]</span></span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight inform7"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Given input matrix =</span><br><span class="line"><span class="comment">[</span></span><br><span class="line"><span class="comment">  <span class="comment">[ 5, 1, 9,11]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[ 2, 4, 8,10]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[13, 3, 6, 7]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[15,14,12,16]</span></span></span><br><span class="line"><span class="comment">]</span>, </span><br><span class="line"></span><br><span class="line">rotate the input matrix in-place such that it becomes:</span><br><span class="line"><span class="comment">[</span></span><br><span class="line"><span class="comment">  <span class="comment">[15,13, 2, 5]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[14, 3, 4, 1]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[12, 6, 8, 9]</span>,</span></span><br><span class="line"><span class="comment">  <span class="comment">[16, 7,10,11]</span></span></span><br><span class="line"><span class="comment">]</span></span><br></pre></td></tr></table></figure><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">rotate</span><span class="params">(<span class="keyword">int</span>[][] matrix)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">int</span> n = matrix[<span class="number">0</span>].length - <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt;= n / <span class="number">2</span>; i++) &#123;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> j = i; j &lt; n - i; j++) &#123;</span><br><span class="line">                <span class="keyword">int</span> temp = matrix[i][j];</span><br><span class="line">                matrix[i][j] = matrix[n - j][i];</span><br><span class="line">                matrix[n - j][i] = matrix[n - i][n - j];</span><br><span class="line">                matrix[n - i][n - j] = matrix[j][n - i];</span><br><span class="line">                matrix[j][n - i] = temp;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;You are given an &lt;em&gt;n&lt;/em&gt; x &lt;em&gt;n&lt;/em&gt; 2D matrix representing an image.&lt;/p&gt;
+&lt;p&gt;Rotate the image by 90 degrees (clockwise).&lt;/p&gt;
+&lt;p&gt;&lt;stro
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Valid Sudoku</title>
+    <link href="https://www.liuyong.cc/2018/06/09/Valid%20Sudoku/"/>
+    <id>https://www.liuyong.cc/2018/06/09/Valid Sudoku/</id>
+    <published>2018-06-09T14:56:44.000Z</published>
+    <updated>2018-06-09T16:04:36.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Determine if a 9x9 Sudoku board is valid. Only the filled cells need to be validated <strong>according to the following rules</strong>:</p><ol><li>Each row must contain the digits <code>1-9</code> without repetition.</li><li>Each column must contain the digits <code>1-9</code> without repetition.</li><li>Each of the 9 <code>3x3</code> sub-boxes of the grid must contain the digits <code>1-9</code> without repetition.</li></ol><p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Sudoku-by-L2G-20050714.svg/250px-Sudoku-by-L2G-20050714.svg.png" alt="img"><br>A partially filled sudoku which is valid.</p><p>The Sudoku board could be partially filled, where empty cells are filled with the character <code>&#39;.&#39;</code>.</p><p><strong>Example 1:</strong></p><figure class="highlight cs"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">Input:</span><br><span class="line">[<span class="meta"></span></span><br><span class="line"><span class="meta">  [<span class="meta-string">"5"</span>,<span class="meta-string">"3"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"7"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"6"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"1"</span>,<span class="meta-string">"9"</span>,<span class="meta-string">"5"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"9"</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"6"</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"6"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"3"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"4"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"3"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"1"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"7"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"2"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"6"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"6"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"2"</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"4"</span>,<span class="meta-string">"1"</span>,<span class="meta-string">"9"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"5"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"7"</span>,<span class="meta-string">"9"</span></span>]</span><br><span class="line">]</span><br><span class="line">Output: <span class="literal">true</span></span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight cs"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Input:</span><br><span class="line">[<span class="meta"></span></span><br><span class="line"><span class="meta">  [<span class="meta-string">"8"</span>,<span class="meta-string">"3"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"7"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"6"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"1"</span>,<span class="meta-string">"9"</span>,<span class="meta-string">"5"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"9"</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"6"</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"6"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"3"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"4"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"3"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"1"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"7"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"2"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"6"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"6"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"2"</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"4"</span>,<span class="meta-string">"1"</span>,<span class="meta-string">"9"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"5"</span></span>],</span><br><span class="line">  [<span class="meta"><span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"8"</span>,<span class="meta-string">"."</span>,<span class="meta-string">"."</span>,<span class="meta-string">"7"</span>,<span class="meta-string">"9"</span></span>]</span><br><span class="line">]</span><br><span class="line">Output: <span class="literal">false</span></span><br><span class="line">Explanation: Same <span class="keyword">as</span> Example <span class="number">1</span>, except with the <span class="number">5</span> <span class="keyword">in</span> the top left corner being </span><br><span class="line">    modified to <span class="number">8.</span> Since there are two <span class="number">8'</span>s <span class="keyword">in</span> the top left <span class="number">3</span>x3 sub-box, it <span class="keyword">is</span> invalid.</span><br></pre></td></tr></table></figure><p><strong>Note:</strong></p><ul><li>A Sudoku board (partially filled) could be valid but is not necessarily solvable.</li><li>Only the filled cells need to be validated according to the mentioned rules.</li><li>The given board contain only digits <code>1-9</code> and the character <code>&#39;.&#39;</code>.</li><li>The given board size is always <code>9x9</code>.</li></ul><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">isValidSudoku</span><span class="params">(<span class="keyword">char</span>[][] board)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">boolean</span>[][] rowFlag = <span class="keyword">new</span> <span class="keyword">boolean</span>[<span class="number">9</span>][<span class="number">9</span>];</span><br><span class="line">        <span class="keyword">boolean</span>[][] colFlag = <span class="keyword">new</span> <span class="keyword">boolean</span>[<span class="number">9</span>][<span class="number">9</span>];</span><br><span class="line">        <span class="keyword">boolean</span>[][] cellFlag = <span class="keyword">new</span> <span class="keyword">boolean</span>[<span class="number">9</span>][<span class="number">9</span>];</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">9</span>; ++i) &#123;</span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> j = <span class="number">0</span>; j &lt; <span class="number">9</span>; ++j) &#123;</span><br><span class="line">                <span class="keyword">if</span> (board[i][j] &gt;= <span class="string">'1'</span> &amp;&amp; board[i][j] &lt;= <span class="string">'9'</span>) &#123;</span><br><span class="line">                    <span class="keyword">int</span> c = board[i][j] - <span class="string">'1'</span>;</span><br><span class="line">                    <span class="keyword">if</span> (rowFlag[i][c] || colFlag[c][j] || cellFlag[<span class="number">3</span> * (i / <span class="number">3</span>) + j / <span class="number">3</span>][c]) <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">                    rowFlag[i][c] = <span class="keyword">true</span>;</span><br><span class="line">                    colFlag[c][j] = <span class="keyword">true</span>;</span><br><span class="line">                    cellFlag[<span class="number">3</span> * (i / <span class="number">3</span>) + j / <span class="number">3</span>][c] = <span class="keyword">true</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Determine if a 9x9 Sudoku board is valid. Only the filled cells need to be validated &lt;strong&gt;according to the following rules&lt;/strong&gt;:&lt;/
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Plus One</title>
+    <link href="https://www.liuyong.cc/2018/06/09/Plus%20One/"/>
+    <id>https://www.liuyong.cc/2018/06/09/Plus One/</id>
+    <published>2018-06-09T14:56:44.000Z</published>
+    <updated>2018-06-09T16:05:04.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given a <strong>non-empty</strong> array of digits representing a non-negative integer, plus one to the integer.</p><p>The digits are stored such that the most significant digit is at the head of the list, and each element in the array contain a single digit.</p><p>You may assume the integer does not contain any leading zero, except the number 0 itself.</p><p><strong>Example 1:</strong></p><figure class="highlight smali"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Input: [1,2,3]</span><br><span class="line">Output: [1,2,4]</span><br><span class="line">Explanation: The<span class="built_in"> array </span>represents the integer 123.</span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight smali"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Input: [4,3,2,1]</span><br><span class="line">Output: [4,3,2,2]</span><br><span class="line">Explanation: The<span class="built_in"> array </span>represents the integer 4321.</span><br></pre></td></tr></table></figure><p>Code:</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">int</span>[] plusOne(<span class="keyword">int</span>[] digits) &#123;</span><br><span class="line">        <span class="keyword">int</span> n = digits.length;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = n - <span class="number">1</span>; i &gt;= <span class="number">0</span>; i--) &#123;</span><br><span class="line">            <span class="keyword">if</span> (digits[i] &lt; <span class="number">9</span>) &#123;</span><br><span class="line">                digits[i] += <span class="number">1</span>;</span><br><span class="line">                <span class="keyword">return</span> digits;</span><br><span class="line">            &#125;</span><br><span class="line">            digits[i] = <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">int</span>[] result = <span class="keyword">new</span> <span class="keyword">int</span>[n + <span class="number">1</span>];</span><br><span class="line">        result[<span class="number">0</span>] = <span class="number">1</span>;</span><br><span class="line">        <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given a &lt;strong&gt;non-empty&lt;/strong&gt; array of digits representing a non-negative integer, plus one to the integer.&lt;/p&gt;
+&lt;p&gt;The digits are st
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Two Sum</title>
+    <link href="https://www.liuyong.cc/2018/06/09/Two%20Sum/"/>
+    <id>https://www.liuyong.cc/2018/06/09/Two Sum/</id>
+    <published>2018-06-09T14:56:44.000Z</published>
+    <updated>2018-06-09T16:04:48.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given an array of integers, return <strong>indices</strong> of the two numbers such that they add up to a specific target.</p><p>You may assume that each input would have <strong>exactly</strong> one solution, and you may not use the <em>same</em> element twice.</p><p><strong>Example:</strong></p><figure class="highlight lsl"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Given nums = [<span class="number">2</span>, <span class="number">7</span>, <span class="number">11</span>, <span class="number">15</span>], target = <span class="number">9</span>,</span><br><span class="line"></span><br><span class="line">Because nums[<span class="number">0</span>] + nums[<span class="number">1</span>] = <span class="number">2</span> + <span class="number">7</span> = <span class="number">9</span>,</span><br><span class="line">return [<span class="number">0</span>, <span class="number">1</span>].</span><br></pre></td></tr></table></figure><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">int</span>[] twoSum(<span class="keyword">int</span>[] nums, <span class="keyword">int</span> target) &#123;</span><br><span class="line">        <span class="keyword">int</span>[] result = <span class="keyword">new</span> <span class="keyword">int</span>[<span class="number">2</span>];</span><br><span class="line">        Map&lt;Integer, Integer&gt; map = <span class="keyword">new</span> HashMap&lt;&gt;();</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; nums.length; i++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (map.containsKey(nums[i])) &#123;</span><br><span class="line">                result[<span class="number">0</span>] = map.get(nums[i]);</span><br><span class="line">                result[<span class="number">1</span>] = i;</span><br><span class="line">                <span class="keyword">return</span> result;</span><br><span class="line">            &#125;</span><br><span class="line">            map.put(target - nums[i], i);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given an array of integers, return &lt;strong&gt;indices&lt;/strong&gt; of the two numbers such that they add up to a specific target.&lt;/p&gt;
+&lt;p&gt;You may
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Move Zeroes</title>
+    <link href="https://www.liuyong.cc/2018/06/09/Move%20Zeroes/"/>
+    <id>https://www.liuyong.cc/2018/06/09/Move Zeroes/</id>
+    <published>2018-06-09T14:56:44.000Z</published>
+    <updated>2018-06-09T16:04:58.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given an array <code>nums</code>, write a function to move all <code>0</code>‘s to the end of it while maintaining the relative order of the non-zero elements.</p><p><strong>Example:</strong></p><figure class="highlight accesslog"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Input: <span class="string">[0,1,0,3,12]</span></span><br><span class="line">Output: <span class="string">[1,3,12,0,0]</span></span><br></pre></td></tr></table></figure><p><strong>Note</strong>:</p><ol><li>You must do this <strong>in-place</strong> without making a copy of the array.</li><li>Minimize the total number of operations.</li></ol><p>Code:</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">moveZeroes</span><span class="params">(<span class="keyword">int</span>[] nums)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>, j = <span class="number">0</span>; i &lt; nums.length; i++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (nums[i] != <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">int</span> temp = nums[i];</span><br><span class="line">                nums[i] = nums[j];</span><br><span class="line">                nums[j++] = temp;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given an array &lt;code&gt;nums&lt;/code&gt;, write a function to move all &lt;code&gt;0&lt;/code&gt;‘s to the end of it while maintaining the relative order of 
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>为什么wait，notify和notifyall定义在Object中</title>
+    <link href="https://www.liuyong.cc/2018/06/04/%E4%B8%BA%E4%BB%80%E4%B9%88wait-notify%E5%92%8Cnotifyall%E5%AE%9A%E4%B9%89%E5%9C%A8Object%E4%B8%AD/"/>
+    <id>https://www.liuyong.cc/2018/06/04/为什么wait-notify和notifyall定义在Object中/</id>
+    <published>2018-06-04T07:56:44.000Z</published>
+    <updated>2018-06-09T13:52:06.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>为什么wait，notify和notifyall定义在Object中，而不是定义在Thread类中？</p><ol><li>wait和nofity在Java中主要是实现线程之间的通信，把它们定义在Object类中，可以使任何Java对象都可以拥有实现线程通讯机制的能力。</li><li>每个对象都可以作为锁。</li><li>在Java中，为了进入临界区代码段，线程需要获得锁并且等待锁可用。它们不知道哪些线程持有锁，但是它们知道锁由哪些线程持有。它们应该等待锁而不是去查找哪个线程在代码块中去要求它们释放锁。</li></ol>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;为什么wait，notify和notifyall定义在Object中，而不是定义在Thread类中？&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;wait和nofity在Java中主要是实现线程之间的通信，把它们定义在Object类中，可以使任何Java对象都可以拥有实现线程通讯机制的能力。
+      
+    
+    </summary>
+    
+      <category term="Java基础" scheme="https://www.liuyong.cc/categories/Java%E5%9F%BA%E7%A1%80/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>Cookie与Session的区别</title>
+    <link href="https://www.liuyong.cc/2018/06/03/Cookie%E4%B8%8ESession%E7%9A%84%E5%8C%BA%E5%88%AB/"/>
+    <id>https://www.liuyong.cc/2018/06/03/Cookie与Session的区别/</id>
+    <published>2018-06-03T07:56:44.000Z</published>
+    <updated>2018-06-09T13:51:56.000Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="Cookie机制"><a href="#Cookie机制" class="headerlink" title="Cookie机制"></a>Cookie机制</h3><p>Cookies是服务器在本地机器上存储的小段文字并随每一个请求发送至同一个服务器。网络服务器用HTTP头向客户端发送Cookies，在客户端，浏览器解析这些Cookies并将它们保存为一个本地文件，它会自动将同一服务器的任何请求缚上这些Cookies。</p><p>具体来说Cookie机制采取的是<strong>在客户端保持状态</strong>的方案。它需要用户打开客户端的Cookie支持，它的作用就是为了<strong>解决HTTP协议无状态</strong>的缺陷。</p><p><strong>Cookie的内容主要包括：名字、值、过期时间、路径和域。</strong></p><p>路径和域一起构成Cookie的作用范围。</p><p>若不设置范围，则Cookie的生命周期为浏览器会话状态期间，关闭浏览器，Cookie就消失。这种Cookie称为会话Cookie，通常保存在内存中。而设置了过期时间的Cookie会被保存至硬盘。</p><h3 id="Session机制"><a href="#Session机制" class="headerlink" title="Session机制"></a>Session机制</h3><p>Session机制是一种服务器端的机制，服务器使用一种类似于散列表的结构来保存信息。</p><p>当程序需要为某个客户端的请求创建一个Session时，服务器首先检查这个客户端里知否已经包含一个Session标识，如果包含则按照Session ID来把这个Session检索出来，检索不到的话会新建一个。</p><p>如果客户端请求不包含Session ID，则为此客户端创建一个Session并生成一个与此Session相关联的Session ID，这个Session ID将在本次响应中返回给客户端。</p><p>保存这个Session ID的方式可以采用Cookie，但如果Cookie被人禁止的话，就必须使用其它机制来传递Session ID。通常使用的一种技术叫做URL重写，就是把Session ID直接附加在URL路径后面；还有一种技术叫做表单隐藏字段，就是服务器会自动修改表单，添加一个隐藏字段，以便表单提交时能欧巴Session ID传回给服务器。</p><h3 id="Cookie与Session的区别"><a href="#Cookie与Session的区别" class="headerlink" title="Cookie与Session的区别"></a>Cookie与Session的区别</h3><h4 id="存取方式不同"><a href="#存取方式不同" class="headerlink" title="存取方式不同"></a>存取方式不同</h4><p>Cookie只能保存ASCII字符串，如果需要存取Unicode字符或者二进制数据，需要先进行编码。</p><p>Cookie中也不能存取Java对象。</p><p>Session可以存取任意类型的数据，包括但不限于String、Integer、List、Map等。</p><p>Session中能够直接报关Java Bean甚至Java类、对象等，可以把Session看作一个Java容器。</p><h4 id="隐私策略不同"><a href="#隐私策略不同" class="headerlink" title="隐私策略不同"></a>隐私策略不同</h4><p>Cookie存储在客户端，对客户端是可见的，客户端可以窥探、复制和修改Cookie中的内容</p><p>Session存储在服务器中，对客户端是透明的，不存在敏感信息泄露的风险。</p><p>Cookie保护隐私的办法：敏感信息不要写进Cookie中，同时将Cookie信息加密，提交至服务器后再进行解密。</p><h4 id="有效期不同"><a href="#有效期不同" class="headerlink" title="有效期不同"></a>有效期不同</h4><p>使用Cookie，然后过期时间设置一个很大的数字，这样能实现登陆信息长期有效。比如Google，登陆一次后Google会持久的记载该用户的登陆信息，不用每次都重新登陆。</p><p>Session依赖于名为JSESSIONID的Cookie，而此Cookie的过期时间默认为-1，当浏览器关闭时该Session就会失效。而如果过期时间设置一个很大的值的时候，服务器的Session就会越堆越多，容易导致内存溢出。</p><h4 id="服务器压力不同"><a href="#服务器压力不同" class="headerlink" title="服务器压力不同"></a>服务器压力不同</h4><p>Session是保管在服务器上的，每个用户都产生一个Session，如果并发访问用户过多，则会产生很多的session消耗大量的内存。</p><p>而反观Cookie，它是保存在客户端的，不会占用服务器资源，所有并发量过大的时候，Cookie会是一个很好的选择。</p><h4 id="浏览器支持不同"><a href="#浏览器支持不同" class="headerlink" title="浏览器支持不同"></a>浏览器支持不同</h4><p>Cookie是需要客户端浏览器支持的，如果被禁用，则会话跟踪就会失效。</p><p>如果不支持Cookie，就需要使用Session，并且要保证所有用到Session的程序都有进行URL地址重写。</p><p>如果浏览器支持Cookie，则Cookie既能设置为本窗口和子窗口有效，也能设置为所有窗口有效。</p><p>但是Session只能在本窗口及子窗口下有效，如果两个浏览器窗口互不相干，则它们将运用两个不同的Session。</p><h4 id="跨域支持上的不同"><a href="#跨域支持上的不同" class="headerlink" title="跨域支持上的不同"></a>跨域支持上的不同</h4><p>Cookie支持跨域名访问，例如把domain属性设置为“.lyog.cn”，则以“.lyog.cn”为后缀的域名都能够访问该Cookie。</p><p>Session仅在它所在的域名内有效。</p><p>实际的生产过程中，不会仅仅使用一种的，而是Cookie和Session搭配使用，这样效果才会更好。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h3 id=&quot;Cookie机制&quot;&gt;&lt;a href=&quot;#Cookie机制&quot; class=&quot;headerlink&quot; title=&quot;Cookie机制&quot;&gt;&lt;/a&gt;Cookie机制&lt;/h3&gt;&lt;p&gt;Cookies是服务器在本地机器上存储的小段文字并随每一个请求发送至同一个服务器。网络服务器
+      
+    
+    </summary>
+    
+      <category term="网络" scheme="https://www.liuyong.cc/categories/%E7%BD%91%E7%BB%9C/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>HTTP中Get请求与Post请求的区别</title>
+    <link href="https://www.liuyong.cc/2018/06/01/HTTP%E4%B8%ADGet%E8%AF%B7%E6%B1%82%E4%B8%8EPost%E8%AF%B7%E6%B1%82%E7%9A%84%E5%8C%BA%E5%88%AB/"/>
+    <id>https://www.liuyong.cc/2018/06/01/HTTP中Get请求与Post请求的区别/</id>
+    <published>2018-06-01T07:56:44.000Z</published>
+    <updated>2018-06-09T13:51:46.000Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="GET和POST长度的限制问题"><a href="#GET和POST长度的限制问题" class="headerlink" title="GET和POST长度的限制问题"></a>GET和POST长度的限制问题</h3><p><strong>GET</strong></p><ul><li>GET是通过URL提交数据，因此GET可提交的数据量就跟URL所能达到的最大长度有直接关系</li><li>实际上HTTP协议对URL长度是没有限制的；限制URL长度大多数是浏览器或者服务器的配置参数</li></ul><p><strong>POST</strong></p><ul><li>HTTP协议没有对POST进行任何限制，一般是受服务器配置限制或者内存大小</li></ul><h3 id="GET和POST的安全性"><a href="#GET和POST的安全性" class="headerlink" title="GET和POST的安全性"></a>GET和POST的安全性</h3><p>GET是通过URL方式请求，可以直接看到，明文传输。 </p><p>POST是通过请求header请求，可以开发者工具或者抓包可以看到，同样也是明文的。</p><p>GET请求会保存在浏览器历史纪录中，还可能会保存在Web的日志中。</p><h3 id="GET和POST对服务器的状态"><a href="#GET和POST对服务器的状态" class="headerlink" title="GET和POST对服务器的状态"></a>GET和POST对服务器的状态</h3><p>根据http的设计，大家在看到get的时候，都期望这个请求对服务器没有修改，看到post的时候，都认为这对服务器产生了修改。 </p><h3 id="GET和POST的幂等性"><a href="#GET和POST的幂等性" class="headerlink" title="GET和POST的幂等性"></a>GET和POST的幂等性</h3><p>幂等是指同一个请求方法执行多次和仅执行一次的效果完全相同。 <strong>GET幂等，POST不幂等</strong> 。</p><p>引入幂等主要是为了处理同一个请求重复发送的情况，比如在请求响应前失去连接，如果方法是幂等的，就可以放心地重发一次请求。这也是浏览器在后退/刷新时遇到POST会给用户提示的原因：POST语义不是幂等的，重复请求可能会带来意想不到的后果。 </p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h3 id=&quot;GET和POST长度的限制问题&quot;&gt;&lt;a href=&quot;#GET和POST长度的限制问题&quot; class=&quot;headerlink&quot; title=&quot;GET和POST长度的限制问题&quot;&gt;&lt;/a&gt;GET和POST长度的限制问题&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;GET&lt;/stron
+      
+    
+    </summary>
+    
+      <category term="网络" scheme="https://www.liuyong.cc/categories/%E7%BD%91%E7%BB%9C/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Intersection of Two Arrays II</title>
+    <link href="https://www.liuyong.cc/2018/05/22/Intersection%20of%20Two%20Arrays%20II/"/>
+    <id>https://www.liuyong.cc/2018/05/22/Intersection of Two Arrays II/</id>
+    <published>2018-05-22T15:25:30.000Z</published>
+    <updated>2018-06-09T13:59:42.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given two arrays, write a function to compute their intersection.</p><p><strong>Example:</strong><br>Given <em>nums1</em> = <code>[1, 2, 2, 1]</code>, <em>nums2</em> = <code>[2, 2]</code>, return <code>[2, 2]</code>.</p><p><strong>Note:</strong></p><ul><li>Each element in the result should appear as many times as it shows in both arrays.</li><li>The result can be in any order.</li></ul><p><strong>Follow up:</strong></p><ul><li>What if the given array is already sorted? How would you optimize your algorithm?</li><li>What if <em>nums1</em>‘s size is small compared to <em>nums2</em>‘s size? Which algorithm is better?</li><li>What if elements of <em>nums2</em> are stored on disk, and the memory is limited such that you cannot load all elements into the memory at once?</li></ul><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">int</span>[] intersect(<span class="keyword">int</span>[] nums1, <span class="keyword">int</span>[] nums2) &#123;</span><br><span class="line">        Arrays.sort(nums1);</span><br><span class="line">        Arrays.sort(nums2);</span><br><span class="line">        <span class="keyword">int</span> len1 = nums1.length;</span><br><span class="line">        <span class="keyword">int</span> len2 = nums2.length;</span><br><span class="line">        <span class="keyword">int</span>[] result = <span class="keyword">new</span> <span class="keyword">int</span>[len1 &gt; len2 ? len1 : len2];</span><br><span class="line">        <span class="keyword">int</span> i = <span class="number">0</span>, j = <span class="number">0</span>, k = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (i &lt; len1 &amp;&amp; j &lt; len2) &#123;</span><br><span class="line">            <span class="keyword">if</span> (nums1[i] == nums2[j]) &#123;</span><br><span class="line">                result[k++] = nums1[i];</span><br><span class="line">                i++;</span><br><span class="line">                j++;</span><br><span class="line">            &#125; <span class="keyword">else</span> <span class="keyword">if</span> (nums1[i] &lt; nums2[j]) &#123;</span><br><span class="line">                i++;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                j++;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> Arrays.copyOf(result, k);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given two arrays, write a function to compute their intersection.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Example:&lt;/strong&gt;&lt;br&gt;Given &lt;em&gt;nums1&lt;/em&gt; = &lt;code&gt;[1, 2,
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Single Number</title>
+    <link href="https://www.liuyong.cc/2018/05/22/Single%20Number/"/>
+    <id>https://www.liuyong.cc/2018/05/22/Single Number/</id>
+    <published>2018-05-22T14:03:17.000Z</published>
+    <updated>2018-06-09T11:41:50.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given a <strong>non-empty</strong> array of integers, every element appears <em>twice</em> except for one. Find that single one.</p><p><strong>Note:</strong></p><p>Your algorithm should have a linear runtime complexity. Could you implement it without using extra memory?</p><p><strong>Example 1:</strong></p><figure class="highlight avrasm"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="symbol">Input:</span> [<span class="number">2</span>,<span class="number">2</span>,<span class="number">1</span>]</span><br><span class="line"><span class="symbol">Output:</span> <span class="number">1</span></span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight avrasm"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="symbol">Input:</span> [<span class="number">4</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">1</span>,<span class="number">2</span>]</span><br><span class="line"><span class="symbol">Output:</span> <span class="number">4</span></span><br></pre></td></tr></table></figure><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">singleNumber</span><span class="params">(<span class="keyword">int</span>[] nums)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">int</span> result = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i :</span><br><span class="line">                nums) &#123;</span><br><span class="line">            result ^= i;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given a &lt;strong&gt;non-empty&lt;/strong&gt; array of integers, every element appears &lt;em&gt;twice&lt;/em&gt; except for one. Find that single one.&lt;/p&gt;
+&lt;p&gt;&lt;
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Contains Duplicate</title>
+    <link href="https://www.liuyong.cc/2018/05/22/Contains%20Duplicate/"/>
+    <id>https://www.liuyong.cc/2018/05/22/Contains Duplicate/</id>
+    <published>2018-05-22T13:38:40.000Z</published>
+    <updated>2018-06-09T11:41:38.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given an array of integers, find if the array contains any duplicates.</p><p>Your function should return true if any value appears at least twice in the array, and it should return false if every element is distinct.</p><p><strong>Example 1:</strong></p><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">Input:</span> <span class="string">[1,2,3,1]</span></span><br><span class="line"><span class="attr">Output:</span> <span class="literal">true</span></span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">Input:</span> <span class="string">[1,2,3,4]</span></span><br><span class="line"><span class="attr">Output:</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure><p><strong>Example 3:</strong></p><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">Input:</span> <span class="string">[1,1,1,3,3,4,3,2,4,2]</span></span><br><span class="line"><span class="attr">Output:</span> <span class="literal">true</span></span><br></pre></td></tr></table></figure><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">containsDuplicate</span><span class="params">(<span class="keyword">int</span>[] nums)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (nums == <span class="keyword">null</span> || nums.length &lt;= <span class="number">1</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        HashSet&lt;Integer&gt; hashSet = <span class="keyword">new</span> HashSet&lt;&gt;();</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i :</span><br><span class="line">                nums) &#123;</span><br><span class="line">            <span class="keyword">if</span> (hashSet.contains(i)) &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                hashSet.add(i);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given an array of integers, find if the array contains any duplicates.&lt;/p&gt;
+&lt;p&gt;Your function should return true if any value appears at le
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Rotate Array</title>
+    <link href="https://www.liuyong.cc/2018/05/22/Rotate%20Array/"/>
+    <id>https://www.liuyong.cc/2018/05/22/Rotate Array/</id>
+    <published>2018-05-22T13:13:52.000Z</published>
+    <updated>2018-06-09T14:00:10.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given an array, rotate the array to the right by <em>k</em> steps, where <em>k</em> is non-negative.</p><p><strong>Example 1:</strong></p><figure class="highlight livecodeserver"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Input: [<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>] <span class="keyword">and</span> k = <span class="number">3</span></span><br><span class="line">Output: [<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>]</span><br><span class="line">Explanation:</span><br><span class="line">rotate <span class="number">1</span> steps <span class="built_in">to</span> <span class="keyword">the</span> <span class="literal">right</span>: [<span class="number">7</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>,<span class="number">6</span>]</span><br><span class="line">rotate <span class="number">2</span> steps <span class="built_in">to</span> <span class="keyword">the</span> <span class="literal">right</span>: [<span class="number">6</span>,<span class="number">7</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>]</span><br><span class="line">rotate <span class="number">3</span> steps <span class="built_in">to</span> <span class="keyword">the</span> <span class="literal">right</span>: [<span class="number">5</span>,<span class="number">6</span>,<span class="number">7</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>]</span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight subunit"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Input: [<span class="string">-1</span>,<span class="string">-100</span>,3,99] and k = 2</span><br><span class="line">Output: [3,99,<span class="string">-1</span>,<span class="string">-100</span>]</span><br><span class="line">Explanation: </span><br><span class="line">rotate 1 steps to the right: [99,<span class="string">-1</span>,<span class="string">-100</span>,3]</span><br><span class="line">rotate 2 steps to the right: [3,99,<span class="string">-1</span>,<span class="string">-100</span>]</span><br></pre></td></tr></table></figure><p><strong>Note:</strong></p><ul><li>Try to come up as many solutions as you can, there are at least 3 different ways to solve this problem.</li><li>Could you do it in-place with O(1) extra space?</li></ul><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">rotate</span><span class="params">(<span class="keyword">int</span>[] nums, <span class="keyword">int</span> k)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (nums == <span class="keyword">null</span></span><br><span class="line">                || nums.length &lt;= <span class="number">1</span></span><br><span class="line">                || k == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        k %= nums.length;</span><br><span class="line">        reverse(nums, <span class="number">0</span>, nums.length - <span class="number">1</span>);</span><br><span class="line">        reverse(nums, <span class="number">0</span>, k - <span class="number">1</span>);</span><br><span class="line">        reverse(nums, k, nums.length - <span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">reverse</span><span class="params">(<span class="keyword">int</span>[] a, <span class="keyword">int</span> s, <span class="keyword">int</span> e)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (s &lt; e) &#123;</span><br><span class="line">            a[s] = a[s] ^ a[e];</span><br><span class="line">            a[e] = a[e] ^ a[s];</span><br><span class="line">            a[s] = a[s++] ^ a[e--];</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given an array, rotate the array to the right by &lt;em&gt;k&lt;/em&gt; steps, where &lt;em&gt;k&lt;/em&gt; is non-negative.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Example 1:&lt;/strong&gt;&lt;/
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Best Time to Buy and Sell Stock II</title>
+    <link href="https://www.liuyong.cc/2018/05/22/Best%20Time%20to%20Buy%20and%20Sell%20Stock%20II/"/>
+    <id>https://www.liuyong.cc/2018/05/22/Best Time to Buy and Sell Stock II/</id>
+    <published>2018-05-22T12:30:23.000Z</published>
+    <updated>2018-06-09T11:41:10.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Say you have an array for which the <em>i</em>th element is the price of a given stock on day <em>i</em>.</p><p>Design an algorithm to find the maximum profit. You may complete as many transactions as you like (i.e., buy one and sell one share of the stock multiple times).</p><p><strong>Note:</strong> You may not engage in multiple transactions at the same time (i.e., you must sell the stock before you buy again).</p><p><strong>Example 1:</strong></p><figure class="highlight applescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Input: [<span class="number">7</span>,<span class="number">1</span>,<span class="number">5</span>,<span class="number">3</span>,<span class="number">6</span>,<span class="number">4</span>]</span><br><span class="line">Output: <span class="number">7</span></span><br><span class="line">Explanation: Buy <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">2</span> (price = <span class="number">1</span>) <span class="keyword">and</span> sell <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">3</span> (price = <span class="number">5</span>), profit = <span class="number">5</span><span class="number">-1</span> = <span class="number">4.</span></span><br><span class="line">             Then buy <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">4</span> (price = <span class="number">3</span>) <span class="keyword">and</span> sell <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">5</span> (price = <span class="number">6</span>), profit = <span class="number">6</span><span class="number">-3</span> = <span class="number">3.</span></span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight applescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Input: [<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>]</span><br><span class="line">Output: <span class="number">4</span></span><br><span class="line">Explanation: Buy <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">1</span> (price = <span class="number">1</span>) <span class="keyword">and</span> sell <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">5</span> (price = <span class="number">5</span>), profit = <span class="number">5</span><span class="number">-1</span> = <span class="number">4.</span></span><br><span class="line">             Note <span class="keyword">that</span> you cannot buy <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">1</span>, buy <span class="keyword">on</span> <span class="built_in">day</span> <span class="number">2</span> <span class="keyword">and</span> sell them later, <span class="keyword">as</span> you are</span><br><span class="line">             engaging multiple transactions <span class="keyword">at</span> <span class="keyword">the</span> same <span class="built_in">time</span>. You must sell <span class="keyword">before</span> buying again.</span><br></pre></td></tr></table></figure><p><strong>Example 3:</strong></p><figure class="highlight groovy"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">Input:</span> [<span class="number">7</span>,<span class="number">6</span>,<span class="number">4</span>,<span class="number">3</span>,<span class="number">1</span>]</span><br><span class="line"><span class="string">Output:</span> <span class="number">0</span></span><br><span class="line"><span class="string">Explanation:</span> In <span class="keyword">this</span> <span class="keyword">case</span>, no transaction is done, i.e. max profit = <span class="number">0.</span></span><br></pre></td></tr></table></figure><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">maxProfit</span><span class="params">(<span class="keyword">int</span>[] prices)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (prices == <span class="keyword">null</span> || prices.length == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">int</span> profit = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i &lt; prices.length; i++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (prices[i] &gt; prices[i - <span class="number">1</span>]) &#123;</span><br><span class="line">                profit += prices[i] - prices[i - <span class="number">1</span>];</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> profit;        </span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Say you have an array for which the &lt;em&gt;i&lt;/em&gt;th element is the price of a given stock on day &lt;em&gt;i&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Design an algorithm to f
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>LeetCode — Remove Duplicates from Sorted Array</title>
+    <link href="https://www.liuyong.cc/2018/05/22/Remove%20Duplicates%20from%20Sorted%20Array/"/>
+    <id>https://www.liuyong.cc/2018/05/22/Remove Duplicates from Sorted Array/</id>
+    <published>2018-05-22T08:53:43.000Z</published>
+    <updated>2018-06-09T11:41:20.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>Given a sorted array <em>nums</em>, remove the duplicates <a href="https://en.wikipedia.org/wiki/In-place_algorithm" target="_blank" rel="noopener"><strong>in-place</strong></a> such that each element appear only <em>once</em> and return the new length.</p><p>Do not allocate extra space for another array, you must do this by <strong>modifying the input array in-place</strong> with O(1) extra memory.</p><p><strong>Example 1:</strong></p><figure class="highlight ada"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Given nums = [<span class="number">1</span>,<span class="number">1</span>,<span class="number">2</span>],</span><br><span class="line"></span><br><span class="line">Your <span class="keyword">function</span> <span class="title">should</span> <span class="keyword">return</span> <span class="type">length</span> = <span class="number">2</span>, <span class="keyword">with</span> the first two elements <span class="keyword">of</span> nums being <span class="number">1</span> <span class="keyword">and</span> <span class="number">2</span> respectively.</span><br><span class="line"></span><br><span class="line">It doesn<span class="symbol">'t</span> matter what you leave beyond the returned length.</span><br></pre></td></tr></table></figure><p><strong>Example 2:</strong></p><figure class="highlight lsl"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Given nums = [<span class="number">0</span>,<span class="number">0</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">2</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">3</span>,<span class="number">4</span>],</span><br><span class="line"></span><br><span class="line">Your function should return length = <span class="number">5</span>, with the first five elements of nums being modified to <span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, and <span class="number">4</span> respectively.</span><br><span class="line"></span><br><span class="line">It doesn't matter what values are set beyond the returned length.</span><br></pre></td></tr></table></figure><p><strong>Clarification:</strong></p><p>Confused why the returned value is an integer but your answer is an array?</p><p>Note that the input array is passed in by <strong>reference</strong>, which means modification to the input array will be known to the caller as well.</p><p>Internally you can think of this:</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// nums is passed in by reference. (i.e., without making a copy)</span></span><br><span class="line"><span class="keyword">int</span> len = removeDuplicates(nums);</span><br><span class="line"></span><br><span class="line"><span class="comment">// any modification to nums in your function would be known by the caller.</span></span><br><span class="line"><span class="comment">// using the length returned by your function, it prints the first len elements.</span></span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; len; i++) &#123;</span><br><span class="line">    print(nums[i]);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>Code：</p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">removeDuplicates</span><span class="params">(<span class="keyword">int</span>[] nums)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">int</span> index = nums.length == <span class="number">0</span>?<span class="number">0</span>:<span class="number">1</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> n :</span><br><span class="line">                nums) &#123;</span><br><span class="line">            <span class="keyword">if</span> (n &gt; nums[index - <span class="number">1</span>]) &#123;</span><br><span class="line">                nums[index++] = n;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> index;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;Given a sorted array &lt;em&gt;nums&lt;/em&gt;, remove the duplicates &lt;a href=&quot;https://en.wikipedia.org/wiki/In-place_algorithm&quot; target=&quot;_blank&quot; rel=
+      
+    
+    </summary>
+    
+      <category term="算法" scheme="https://www.liuyong.cc/categories/%E7%AE%97%E6%B3%95/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>Java序列化与反序列化</title>
+    <link href="https://www.liuyong.cc/2018/05/18/Java%E5%BA%8F%E5%88%97%E5%8C%96%E4%B8%8E%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96/"/>
+    <id>https://www.liuyong.cc/2018/05/18/Java序列化与反序列化/</id>
+    <published>2018-05-18T07:56:44.000Z</published>
+    <updated>2018-06-09T13:52:30.000Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="序列化的作用"><a href="#序列化的作用" class="headerlink" title="序列化的作用"></a>序列化的作用</h3><p>Java平台允许我们在内存中创建可复用的Java对象，但一般情况下，只有当JVM处于运行时，这些对象才可能存在，即，这些对象的生命周期不会比JVM的生命周期更长。但在现实应用中，就可能要求在JVM停止运行之后能够保存(持久化)指定的对象，并在将来重新读取被保存的对象。Java对象序列化就能够帮助我们实现该功能。</p><p>使用Java对象序列化，在保存对象时，会把其状态保存为一组字节，在未来，再将这些字节组装成对象。必须注意地是，对象序列化保存的是对象的”状态”，即它的成员变量。由此可知，<strong>对象序列化不会关注类中的静态变量</strong>。</p><p>除了在持久化对象时会用到对象序列化之外，当使用RMI(远程方法调用)，或在网络中传递对象时，都会用到对象序列化。</p><h3 id="序列化与反序列化的特性"><a href="#序列化与反序列化的特性" class="headerlink" title="序列化与反序列化的特性"></a>序列化与反序列化的特性</h3><ol><li>在Java中，只要一个类实现了<code>java.io.Serializable</code>接口，那么它就可以被序列化。 </li><li>通过<code>ObjectOutputStream</code>和<code>ObjectInputStream</code>对对象进行序列化及反序列化。</li><li>虚拟机是否允许反序列化，不仅取决于类路径和功能代码是否一致，一个非常重要的一点是两个类的序列化 ID 是否一致（就是 <code>private static final long serialVersionUID</code>）。</li><li>序列化并不保存静态变量。 </li><li>要想将父类对象也序列化，就需要让父类也实现<code>Serializable</code> 接口。 </li><li>Transient 关键字的作用是控制变量的序列化，在变量声明前加上该关键字，可以阻止该变量被序列化到文件中，在被反序列化后，transient 变量的值被设为初始值，如 int 型的是 0，对象型的是 null。 </li><li>服务器端给客户端发送序列化对象数据，对象中有一些数据是敏感的，比如密码字符串等，希望对该密码字段在序列化时，进行加密，而客户端如果拥有解密的密钥，只有在客户端进行反序列化时，才可以对密码进行读取，这样可以一定程度保证序列化对象的数据安全。  </li></ol>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h3 id=&quot;序列化的作用&quot;&gt;&lt;a href=&quot;#序列化的作用&quot; class=&quot;headerlink&quot; title=&quot;序列化的作用&quot;&gt;&lt;/a&gt;序列化的作用&lt;/h3&gt;&lt;p&gt;Java平台允许我们在内存中创建可复用的Java对象，但一般情况下，只有当JVM处于运行时，这些对象才可能存
+      
+    
+    </summary>
+    
+      <category term="Java基础" scheme="https://www.liuyong.cc/categories/Java%E5%9F%BA%E7%A1%80/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>equals与hashCode方法的联系</title>
+    <link href="https://www.liuyong.cc/2018/05/08/equals%E4%B8%8EhashCode%E6%96%B9%E6%B3%95%E7%9A%84%E8%81%94%E7%B3%BB/"/>
+    <id>https://www.liuyong.cc/2018/05/08/equals与hashCode方法的联系/</id>
+    <published>2018-05-08T07:56:44.000Z</published>
+    <updated>2018-06-09T13:52:16.000Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="equals方法"><a href="#equals方法" class="headerlink" title="equals方法"></a>equals方法</h3><p>equals()是用来判断其他的对象是否和该对象相等。</p><p>equals()在object类中定义如下： </p><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">equals</span><span class="params">(Object obj)</span> </span>&#123;  </span><br><span class="line">    <span class="keyword">return</span> (<span class="keyword">this</span> == obj);  </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>很明显是两个对象的地址值的比较。通常封装类有用到这个equals()时，都会对它进行重写。</p><p>它具有以下性质：</p><ul><li>自反性：对任意不为null的引用值x，x.equals(x)一定为true</li><li>对称性：对任意不为null的引用值x和y，当x.equals(y)为true时，y.equals(x)也为true</li><li>传递性：对任意不为null的引用值x、y、z，当x.equals(y)为true，并且y.equals(z)也为true时，x.equals(z)也为true</li><li>一致性：对任意不为null的引用值x和y，在对象信息没有被改的情况下，多次调用x.equals(y)结果不变</li></ul><p><strong>当equals()方法被override时，hashCode()也要被override，因为相等的对象，hashCode一定相等。</strong></p><h3 id="hashCode方法"><a href="#hashCode方法" class="headerlink" title="hashCode方法"></a>hashCode方法</h3><p>hashCode()会给对象返回一个hashCode值。</p><p>它的性质：</p><ul><li>在一个Java应用的执行期间，如果一个对象提供给equals做比较的信息没有被修改的话，该对象多次调用hashCode方法，该方法必须始终如一返回同一个Integer。</li><li>如果两个对象根据equals方法是相等的，那么调用二者各自的hashCode方法必须产生同一个Integer结果。</li><li>并不要求根据equals(java.lang.Object)方法不相等的两个对象，调用二者各自的hashCode方法必须产生不同的integer结果。 </li></ul><h3 id="hashCode方法和equals方法的联系"><a href="#hashCode方法和equals方法的联系" class="headerlink" title="hashCode方法和equals方法的联系"></a>hashCode方法和equals方法的联系</h3><p>如何判断元素是否在HashSet中重复，过程如下：</p><ol><li>判断两个对象hashCode是否相等<ul><li>如果不相等，则认为两个对象也不相等</li><li>如果相等，进行下一步，判断equals是否相等</li></ul></li><li>判断两个对象equals运算是否相等<ul><li>如果不相等，两个对象不相等</li><li>如果相等，两个对象相等</li></ul></li></ol><p><strong>步骤一的作用主要是为了提高存储效率。</strong></p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h3 id=&quot;equals方法&quot;&gt;&lt;a href=&quot;#equals方法&quot; class=&quot;headerlink&quot; title=&quot;equals方法&quot;&gt;&lt;/a&gt;equals方法&lt;/h3&gt;&lt;p&gt;equals()是用来判断其他的对象是否和该对象相等。&lt;/p&gt;
+&lt;p&gt;equals()在ob
+      
+    
+    </summary>
+    
+      <category term="Java基础" scheme="https://www.liuyong.cc/categories/Java%E5%9F%BA%E7%A1%80/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>二维码纠错原理</title>
+    <link href="https://www.liuyong.cc/2018/05/01/%E4%BA%8C%E7%BB%B4%E7%A0%81%E7%BA%A0%E9%94%99%E5%8E%9F%E7%90%86/"/>
+    <id>https://www.liuyong.cc/2018/05/01/二维码纠错原理/</id>
+    <published>2018-05-01T15:14:44.000Z</published>
+    <updated>2018-05-21T14:44:06.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>前言：今天坐车的时候看到座位上有个被污染二维码，然后发现依然被识别，心里纳闷这二维码究竟是一个什么纠错原理？</p><h3 id="Reed-solomon-codes"><a href="#Reed-solomon-codes" class="headerlink" title="Reed-solomon codes"></a>Reed-solomon codes</h3><p>在网上搜寻一番，发现二维码通过RS码进行纠错。关于RS码，维基百科是这么定义的：</p><blockquote><p>里德-所罗门码（里所码，Reed-solomon codes，简称RS codes）是一种前向错误更正的信道编码，对由校正过采样数据所产生的有效多项式。编码过程首先在多个点上对这些多项式求冗余，然后将其传输或者存储。对多项式的这种超出必要值得采样使得多项式超定（过限定）。当接收器正确的收到足够的点后，它就可以恢复原来的多项式，即使接收到的多项式上有很多点被噪声干扰失真。</p></blockquote><p>好了，说人话：任意k个确定点可以表示一个阶数至少为k-1的多项式，比如我们只需要16个点就可以确定这个多项式，但是可以发送25个点的数据，所以我们可以在其它点对这个多项式求冗余，哪怕25个点里有几个点缺失了，也可以通过剩余的点去反推出最初的多项式。</p><a id="more"></a> <h3 id="二维码纠错能力"><a href="#二维码纠错能力" class="headerlink" title="二维码纠错能力"></a>二维码纠错能力</h3><p>二维码纠错分为四个级别：</p><ul><li>级别L：7%</li><li>级别M：15%</li><li>级别Q：25%</li><li>级别H：30%</li></ul><p>纠错能力越高，所占用的数据量越大，二维码尺寸越大。</p><p>至于纠错比例是如何计算的呢，我们举个例子：<br>例如，需要编码的码字数据有100个，并且想对其中的一半，也就是50个码字进行纠错，则计算方法如下。纠错需要相当于码字2倍的符号（RS编码），因此在这种情况下的数量为50个×2＝100码字。因此，全部码字数量为200个，其中用作纠错的码字为50个，所以计算得出，相对于全部码字的纠错率就是25%。这一比率相当于QR码纠错级别中的“Q”级别。</p><hr><p><a href="https://coolshell.cn/articles/10590.html" target="_blank" rel="noopener">《二维码的生成细节和原理》</a>是左耳朵耗子陈皓大大的文章，写的非常棒。关于二维码的生成细节可以看这篇文章，我这里就不献丑了。</p>]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;前言：今天坐车的时候看到座位上有个被污染二维码，然后发现依然被识别，心里纳闷这二维码究竟是一个什么纠错原理？&lt;/p&gt;
+&lt;h3 id=&quot;Reed-solomon-codes&quot;&gt;&lt;a href=&quot;#Reed-solomon-codes&quot; class=&quot;headerlink&quot; title=&quot;Reed-solomon codes&quot;&gt;&lt;/a&gt;Reed-solomon codes&lt;/h3&gt;&lt;p&gt;在网上搜寻一番，发现二维码通过RS码进行纠错。关于RS码，维基百科是这么定义的：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;里德-所罗门码（里所码，Reed-solomon codes，简称RS codes）是一种前向错误更正的信道编码，对由校正过采样数据所产生的有效多项式。编码过程首先在多个点上对这些多项式求冗余，然后将其传输或者存储。对多项式的这种超出必要值得采样使得多项式超定（过限定）。当接收器正确的收到足够的点后，它就可以恢复原来的多项式，即使接收到的多项式上有很多点被噪声干扰失真。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;好了，说人话：任意k个确定点可以表示一个阶数至少为k-1的多项式，比如我们只需要16个点就可以确定这个多项式，但是可以发送25个点的数据，所以我们可以在其它点对这个多项式求冗余，哪怕25个点里有几个点缺失了，也可以通过剩余的点去反推出最初的多项式。&lt;/p&gt;
+    
+    </summary>
+    
+      <category term="一些思考" scheme="https://www.liuyong.cc/categories/%E4%B8%80%E4%BA%9B%E6%80%9D%E8%80%83/"/>
+    
+    
+  </entry>
+  
+  <entry>
+    <title>抽象类和接口的区别</title>
+    <link href="https://www.liuyong.cc/2018/04/02/%E6%8A%BD%E8%B1%A1%E7%B1%BB%E5%92%8C%E6%8E%A5%E5%8F%A3%E7%9A%84%E5%8C%BA%E5%88%AB/"/>
+    <id>https://www.liuyong.cc/2018/04/02/抽象类和接口的区别/</id>
+    <published>2018-04-02T07:56:44.000Z</published>
+    <updated>2018-06-09T13:50:36.000Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="抽象类（abstract-class）"><a href="#抽象类（abstract-class）" class="headerlink" title="抽象类（abstract class）"></a>抽象类（abstract class）</h3><p>定义：如果一个类没有包含足够多的信息来描述一个具体的对象，这样的类就是抽象类。 使用abstract来修饰。</p><p>特点：</p><ul><li>不能实例化 ，只能被继承</li><li>被abstract修饰的方法 ，只声明，不实现</li><li>含有含有抽象方法 的类必须为抽象类</li></ul><a id="more"></a><h3 id="接口（interface）"><a href="#接口（interface）" class="headerlink" title="接口（interface）"></a>接口（interface）</h3><p>定义：接口在Java中是一个抽象类型，是抽象方法的集合。 </p><p>特点：</p><ul><li>接口不是类，所以没有构造方式 </li><li>方法必须是抽象的 </li><li>除了static、final变量，不能有其他变量 </li><li>支持多继承 </li><li>实现某个接口的类必须在类中实现该接口的全部方法</li></ul><h3 id="抽象类和接口的区别"><a href="#抽象类和接口的区别" class="headerlink" title="抽象类和接口的区别"></a>抽象类和接口的区别</h3><h4 id="方法"><a href="#方法" class="headerlink" title="方法"></a>方法</h4><p>抽象类可以有已经实现的方法，也可以有抽象方法；接口里的方法必须全部是抽象的。</p><p>抽象类的方法可以有public、protected和default这些修饰符 ；接口的方法必须是public。</p><p>抽象类比接口速度快，因为接口要去类中寻找实现。</p><h4 id="方法实现"><a href="#方法实现" class="headerlink" title="方法实现"></a>方法实现</h4><p>抽象类不能被实例化，只能被继承。同时子类必须实现父类的所有抽象方法才能被实例化，不然子类只能定义为抽象类；实现接口的类必须实现接口所有的抽象方法。</p><p>抽象类使用extends来继承，只能单继承；接口使用implements来继承，可以多继承。</p><h4 id="构造器"><a href="#构造器" class="headerlink" title="构造器"></a>构造器</h4><p>抽象类有构造器，而接口没有</p>]]></content>
+    
+    <summary type="html">
+    
+      &lt;h3 id=&quot;抽象类（abstract-class）&quot;&gt;&lt;a href=&quot;#抽象类（abstract-class）&quot; class=&quot;headerlink&quot; title=&quot;抽象类（abstract class）&quot;&gt;&lt;/a&gt;抽象类（abstract class）&lt;/h3&gt;&lt;p&gt;定义：如果一个类没有包含足够多的信息来描述一个具体的对象，这样的类就是抽象类。 使用abstract来修饰。&lt;/p&gt;
+&lt;p&gt;特点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不能实例化 ，只能被继承&lt;/li&gt;
+&lt;li&gt;被abstract修饰的方法 ，只声明，不实现&lt;/li&gt;
+&lt;li&gt;含有含有抽象方法 的类必须为抽象类&lt;/li&gt;
+&lt;/ul&gt;
+    
+    </summary>
+    
+      <category term="Java基础" scheme="https://www.liuyong.cc/categories/Java%E5%9F%BA%E7%A1%80/"/>
+    
+    
+  </entry>
+  
+</feed>
