@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://liuyong.cc/"/>
-  <updated>2019-03-17T14:59:59.312Z</updated>
+  <updated>2019-03-18T13:15:00.743Z</updated>
   <id>https://liuyong.cc/</id>
   
   <author>
@@ -21,18 +21,14 @@
     <link href="https://liuyong.cc/2019/03/17/%E6%95%B0%E6%8D%AE%E4%B8%80%E8%87%B4%E6%80%A7%E5%9F%BA%E7%A1%80%E7%90%86%E8%AE%BA%E6%A2%B3%E7%90%86/"/>
     <id>https://liuyong.cc/2019/03/17/数据一致性基础理论梳理/</id>
     <published>2019-03-17T14:55:58.000Z</published>
-    <updated>2019-03-17T14:59:59.312Z</updated>
+    <updated>2019-03-18T13:15:00.743Z</updated>
     
-    <content type="html"><![CDATA[<p>趁着周末时间，把数据一致性的基础理论从头到尾梳理了一遍，真是酣畅淋漓。</p><p>下面思维导图献上：</p><p><img src="https://ws1.sinaimg.cn/large/80854ce7ly1g166lvqxcfj24dk7s1e84.jpg" alt=""></p>]]></content>
+    <content type="html"><![CDATA[<p>趁着周末时间，把数据一致性的基础理论从头到尾梳理了一遍，真是酣畅淋漓。</p><p>下面思维导图献上：</p><a id="more"></a><p><img src="https://ws1.sinaimg.cn/large/80854ce7ly1g166lvqxcfj24dk7s1e84.jpg" alt=""></p>]]></content>
     
     <summary type="html">
     
-      
-      
-        &lt;p&gt;趁着周末时间，把数据一致性的基础理论从头到尾梳理了一遍，真是酣畅淋漓。&lt;/p&gt;
+      &lt;p&gt;趁着周末时间，把数据一致性的基础理论从头到尾梳理了一遍，真是酣畅淋漓。&lt;/p&gt;
 &lt;p&gt;下面思维导图献上：&lt;/p&gt;
-&lt;p&gt;&lt;img src=&quot;https://ws1.sinaimg.cn/large/80854ce7ly1g166lvqxcfj24dk7s1e84.jpg&quot; 
-      
     
     </summary>
     
