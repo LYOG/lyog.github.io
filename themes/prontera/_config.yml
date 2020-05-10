@@ -3,8 +3,8 @@ favicon: /favicon.ico
 
 # Nav Menus
 menu:
-    现在: /
-    过去: /archives/
+    Home: /
+    Archives: /archives/
     # 关于: /about/
 
 # Nav Shortcut Icons
