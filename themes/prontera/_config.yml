@@ -3,9 +3,9 @@ favicon: /favicon.ico
 
 # Nav Menus
 menu:
-    Home: /
-    Archives: /archives/
-    # 关于: /about/
+    主页: /
+    归档: /archives/
+    关于我: /about/
 
 # Nav Shortcut Icons
 # nav_icons:
@@ -14,8 +14,8 @@ menu:
 
 # Friend Links
 friend_links:
-    - ['我的书单', '', 'https://lyog.github.io/book-list/']
-    - ['关于我', '', 'https://lyog.github.io/about/']
+    # - ['我的书单', '', 'https://lyog.github.io/book-list/']
+    # - ['关于我', '', 'https://lyog.github.io/about/']
     
 
 
