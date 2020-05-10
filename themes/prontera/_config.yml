@@ -1,0 +1,38 @@
+favicon: /favicon.ico
+
+
+# Nav Menus
+menu:
+    现在: /
+    过去: /archives/
+    # 关于: /about/
+
+# Nav Shortcut Icons
+# nav_icons:
+    # - ['/images/github.svg', 'https://github.com/Lyog']
+    # - ['/images/rss.svg', '/atom.xml']
+
+# Friend Links
+friend_links:
+    - ['我的书单', '', 'https://lyog.github.io/book-list/']
+    - ['关于我', '', 'https://lyog.github.io/about/']
+    
+
+
+# About
+about_info:
+    name: "盒子"
+    bio: "我想出门晒太阳"
+    avatar: "/images/avatar.png"
+
+# Comment
+# e.g disqus: seansun
+disqus: 
+duoshuo: 
+
+# Analytics
+google_analytics: 
+tencent_analytics: 
+ 
+# Copyright Infomation
+startyear: 2017
