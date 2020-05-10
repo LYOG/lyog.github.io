@@ -1,0 +1,23 @@
+<!DOCTYPE html><html lang="zh-Hans"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> Java运行时异常与一般异常有何异同 · 盒子笔迹</title><meta name="description" content="Java运行时异常与一般异常有何异同 - 盒子"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/css/prontera.css"><link rel="search" type="application/opensearchdescription+xml" href="lyog.github.io/atom.xml" title="盒子笔迹"><meta name="generator" content="Hexo 4.2.0"><link rel="alternate" href="/atom.xml" title="盒子笔迹" type="application/atom+xml">
+</head><body><header class="feature-header"><nav class="component-nav"><ul><div class="logo-container"><a href="/"><h2 class="title">盒子笔迹</h2></a></div><a href="/" target="_self" class="li component-nav-item"><p>现在</p></a><a href="/archives/" target="_self" class="li component-nav-item"><p>过去</p></a></ul></nav><!--        ul.shortcut-icons--><!--            each nav_item in theme.nav_icons--><!--                a(href=nav_item[1] target="_blank")--><!--                    img.icon(src=nav_item[0])--></header><main class="container"><div id="post-container"><div class="post"><article class="post-block"><h1 class="post-title">Java运行时异常与一般异常有何异同</h1><div class="post-info">Mar 9, 2018</div><div class="post-content"><p>Throwable是所有Java程序中错误处理的父类，有两种资类：Error和Exception。</p>
+<ul>
+<li>Error：表示由JVM所侦测到的无法预期的错误，由于这是属于JVM层次的严重错误，导致JVM无法继续执行，因此，这是不可捕捉到的，无法采取任何恢复的操作，顶多只能显示错误信息。</li>
+<li>Exception：表示可恢复的例外，这是可捕捉到的。 </li>
+</ul>
+<p>Java提供了两类主要的异常:runtime exception和checked exception </p>
+<ul>
+<li>checked 异常也就是我们经常遇到的IO异常，以及SQL异常都是这种异常。对于这种异常，JAVA编译器强制要求我们必需对出现的这些异常进行catch。这类异常一般是外部错误,例如试图从文件尾后读取数据等,这并不是程序本身的错误,而是在应用环境中出现的外部错误 。</li>
+<li>runtime exception，也称运行时异常，我们可以不处理。当出现这样的异常时，总是由虚拟机接管。出现运行时异常后，系统会把异常一直往上层抛，一直遇到处理代码。如果没有处理块，到最上层，如果是多线程就由Thread.run()抛出，如果是单线程就被main()抛出。抛出之后，如果是线程，这个线程也就退出了。如果是主程序抛出的异常，那么这整个程序也就退出了 。</li>
+</ul>
+<a id="more"></a> 
+
+<p>常见的运行时异常：</p>
+<ul>
+<li>ArrayStoreException：试图将错误类型的对象存储到一个对象数组时抛出的异常</li>
+<li>ClassCastException：试图将对象强制转换为不是实例的子类时，抛出该异常 </li>
+<li>IllegalArgumentException：抛出的异常表明向方法传递了一个不合法或不正确的参数</li>
+<li>IndexOutOfBoundsException ：指示某排序索引（例如对数组、字符串或向量的排序）超出范围时抛出 </li>
+<li>NoSuchElementException：表明枚举中没有更多的元素 </li>
+<li>NullPointerException：当应用程序试图在需要对象的地方使用 null 时，抛出该异常 </li>
+</ul>
+</div></article></div></div></main><footer class="footer-container"><div class="paginator"><a href="/post/85230167.html" class="prev">PREV</a><a href="/post/cccfa5c8.html" class="next">NEXT</a></div><div class="copyright"><p>© 2017 - 2020 <a href="lyog.github.io">盒子</a> , Powered By <a href="https://hexo.io/" target="_blank">Hexo</a>.</p></div></footer></body></html>

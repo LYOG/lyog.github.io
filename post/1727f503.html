@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="zh-Hans"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><title> Java虚拟机内存区域划分 · 盒子笔迹</title><meta name="description" content="Java虚拟机内存区域划分 - 盒子"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/css/prontera.css"><link rel="search" type="application/opensearchdescription+xml" href="lyog.github.io/atom.xml" title="盒子笔迹"><meta name="generator" content="Hexo 4.2.0"><link rel="alternate" href="/atom.xml" title="盒子笔迹" type="application/atom+xml">
+</head><body><header class="feature-header"><nav class="component-nav"><ul><div class="logo-container"><a href="/"><h2 class="title">盒子笔迹</h2></a></div><a href="/" target="_self" class="li component-nav-item"><p>现在</p></a><a href="/archives/" target="_self" class="li component-nav-item"><p>过去</p></a></ul></nav><!--        ul.shortcut-icons--><!--            each nav_item in theme.nav_icons--><!--                a(href=nav_item[1] target="_blank")--><!--                    img.icon(src=nav_item[0])--></header><main class="container"><div id="post-container"><div class="post"><article class="post-block"><h1 class="post-title">Java虚拟机内存区域划分</h1><div class="post-info">Mar 25, 2018</div><div class="post-content"><p>java虚拟机的主要作用是加载并执行class文件。而在执行class文件中，如何存放class中的代码？运行过程中会生成大量的对象，这些对象如何存储？同时在执行过程中如何保存执行状态？其实都保存在Java内存区域中，而如何合理的划分这个区域，是我们关注的重点。<br>根据《Java虚拟机规范》的规定，Java虚拟机所管理的内存将分成如下几个运行时数据区域。</p>
+<a id="more"></a> ![Java虚拟机运行时数据区][1]
+
+<h3 id="一、程序计数器"><a href="#一、程序计数器" class="headerlink" title="一、程序计数器"></a>一、程序计数器</h3><p>程序计数器用来存储下一条指令的地址，字节码解释器就是通过改变程序计数器的值来选取下一条指令的。<br><strong>特性：</strong></p>
+<ol>
+<li>和线程相关联，每个线程都有一个私有程序寄存器。（为的是多条线程切换时计数器不受影响）</li>
+<li>执行Native方法时，计数器值为Undefined。（所有这个区域没有规定任何OutOfMemoryError情况）</li>
+</ol>
+<h3 id="二、虚拟机栈"><a href="#二、虚拟机栈" class="headerlink" title="二、虚拟机栈"></a>二、虚拟机栈</h3><p>虚拟机栈是线程的执行区域，保存着线程中方法调用的状态。每个方法都对应一个栈帧，一个方法从调用到结束，就是一个栈帧从压栈到出栈的过程。（栈帧保存着此方法的局部变量表、操作数栈、动态链接、方法出口等信息）<br><strong>特性：</strong></p>
+<ol>
+<li>线程私有，每个线程都有自己的栈，生命周期与线程相同。</li>
+<li>栈帧中局部变量表的大小在方法运行期间固定。（编译期间就可知8种基本类型、对象引用(reference类型)和returnAddress类型，long和double占2个局部变量空间(Slot)，其余类型占1个）</li>
+<li>线程请求的栈深度大于虚拟机允许深度，抛出StackOverflowError。</li>
+<li>如果栈可以动态扩展，但是无法申请到足够的空间时，抛出OutOfMemoryError。</li>
+</ol>
+<h3 id="三、本地方法栈"><a href="#三、本地方法栈" class="headerlink" title="三、本地方法栈"></a>三、本地方法栈</h3><p>同虚拟机栈作用相似，它调用的是由C/C++编写的本地方法。<br><strong>特性：</strong></p>
+<ol>
+<li>HotSpot将本地方法栈和虚拟机栈合二为一。</li>
+<li>同样具有StackOverflowError和OutOfMemoryError。</li>
+</ol>
+<h3 id="四、堆"><a href="#四、堆" class="headerlink" title="四、堆"></a>四、堆</h3><p>所有运行时产生的对象全部都存放于堆中，是GC关注的重点区域。<br><strong>特性：</strong></p>
+<ol>
+<li>被所有线程共享，在虚拟机启动时被创建。</li>
+<li>是GC管理的主要区域。</li>
+<li>物理上可以不连续，逻辑是连续即可。</li>
+<li>会发生内存泄漏或者内存溢出。(内存泄漏是指对象无用时无法被被GC回收，内存溢出是指无法申请到足够内存)</li>
+</ol>
+<h3 id="五、方法区"><a href="#五、方法区" class="headerlink" title="五、方法区"></a>五、方法区</h3><p>用于存储已被虚拟机加载的类信息、常量、静态变量、即使编译器编译后的代码等数据。<br><strong>特性：</strong></p>
+<ol>
+<li>一个虚拟机中只有一个方法区，可以被各个线程共享。</li>
+<li>生命周期很长，一般伴随整个程序的生命周期。</li>
+<li>可以选择不实现垃圾收集，对这个区域的回收目标主要是：常量池的回收和类型的卸载。</li>
+<li>方法区无法满足分配需求时，抛出OutOfMemoryError。</li>
+</ol>
+<h3 id="六、运行时常量池"><a href="#六、运行时常量池" class="headerlink" title="六、运行时常量池"></a>六、运行时常量池</h3><p>运行时常量池是方法区的一部分，用于存放生成的各种字面量和符号引用。<br><strong>特性：</strong></p>
+<ol>
+<li>必须是类被加载后，才能把此类的各个字面量和符号引用存到运行时常量池中。</li>
+<li>具有动态性，可以将运行期间产生的新常量放入池中。(String.intern()作用：将首次出现的实例引用记录在常量池中)</li>
+</ol>
+</div></article></div></div></main><footer class="footer-container"><div class="paginator"><a href="/post/6b3bea20.html" class="prev">PREV</a><a href="/post/7c65aac7.html" class="next">NEXT</a></div><div class="copyright"><p>© 2017 - 2020 <a href="lyog.github.io">盒子</a> , Powered By <a href="https://hexo.io/" target="_blank">Hexo</a>.</p></div></footer></body></html>
