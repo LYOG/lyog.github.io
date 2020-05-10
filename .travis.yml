@@ -1,22 +1,3 @@
-# sudo: false
-# language: node_js
-# node_js:
-#   - 10 # use nodejs v10 LTS
-# cache: npm
-# branches:
-#   only:
-#     - gh-pages # build master branch only
-# script:
-#   - hexo generate # generate static files
-# deploy:
-#   provider: pages
-#   skip-cleanup: true
-#   github-token: $GH_TOKEN
-#   keep-history: true
-#   on:
-#     branch: master
-#   local-dir: public
-
 sudo: false
 language: node_js
 node_js:
@@ -24,7 +5,7 @@ node_js:
 cache: npm
 branches:
   only:
-    - gh-pages # 当hexo分支有新的commit时执行 
+    - hexo # 当hexo分支有新的commit时执行 
 script:
   - hexo generate 
 deploy:
@@ -35,4 +16,4 @@ deploy:
   github-token: $GH_TOKEN
   keep-history: true
   on:
-    branch: gh-pages # 博客的源码分支
+    branch: hexo # 博客的源码分支
